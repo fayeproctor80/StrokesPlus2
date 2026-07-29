@@ -1,0 +1,88 @@
+name: Build StrokesPlus
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/build.yml"
+      - "StrokesPlus/**"
+      - "StrokesPlusHook/**"
+      - "alien-0.5.1/**"
+      - "boost_1_50_0/**"
+      - "lua-5.2.1/**"
+      - "scintilla_320/**"
+      - "StrokesPlus.sln"
+
+permissions:
+  contents: read
+
+jobs:
+  build-x64:
+    name: Build unsigned x64 release
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build x64 release
+        shell: cmd
+        run: >-
+          msbuild StrokesPlus.sln
+          /m
+          /t:Rebuild
+          /p:Configuration="Release (Unsigned)"
+          /p:Platform=x64
+          /p:PlatformToolset=v143
+          /p:WindowsTargetPlatformVersion=10.0
+          /p:PreferredToolArchitecture=x64
+          /verbosity:minimal
+
+      - name: Create executable and portable package
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:GITHUB_WORKSPACE 'bin\Release (Unsigned)\x64'
+          $exe = Join-Path $output 'StrokesPlus.exe'
+          $dll = Join-Path $output 'StrokesPlus.dll'
+
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Build did not produce $exe"
+          }
+          if (-not (Test-Path -LiteralPath $dll)) {
+            throw "Build did not produce $dll"
+          }
+
+          $dist = Join-Path $env:GITHUB_WORKSPACE 'dist'
+          $portable = Join-Path $dist 'StrokesPlus-portable-x64'
+          New-Item -ItemType Directory -Force -Path $portable | Out-Null
+
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $dist 'StrokesPlus-x64.exe')
+          Copy-Item -LiteralPath $exe -Destination $portable
+          Copy-Item -LiteralPath $dll -Destination $portable
+          Copy-Item -LiteralPath 'LICENSE.md' -Destination (Join-Path $portable 'Licenses.txt')
+          Copy-Item -LiteralPath 'README.md' -Destination $portable
+          Copy-Item -LiteralPath 'Help\ActionHelp.xml' -Destination $portable
+          Copy-Item -LiteralPath 'Help\StrokesPlus.html' -Destination $portable
+          Copy-Item -LiteralPath 'Help\images' -Destination $portable -Recurse
+
+          Compress-Archive -Path (Join-Path $portable '*') `
+            -DestinationPath (Join-Path $dist 'StrokesPlus-portable-x64.zip') `
+            -CompressionLevel Optimal
+
+          Get-ChildItem -LiteralPath $dist -Recurse | Select-Object FullName, Length
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: StrokesPlus-x64
+          path: |
+            dist/StrokesPlus-x64.exe
+            dist/StrokesPlus-portable-x64.zip
+          if-no-files-found: error
+          retention-days: 30
