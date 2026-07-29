@@ -13,6 +13,10 @@ on:
       - "boost_1_50_0/**"
       - "lua-5.2.1/**"
       - "scintilla_320/**"
+      - "bin/Release (Unsigned)/x64/ActionHelp.xml"
+      - "bin/Release (Unsigned)/x64/Licenses.txt"
+      - "bin/Release (Unsigned)/x64/StrokesPlus.lua"
+      - "bin/Release (Unsigned)/x64/StrokesPlus.xml"
       - "StrokesPlus.sln"
 
 permissions:
@@ -58,6 +62,23 @@ jobs:
             throw "Build did not produce $dll"
           }
 
+          $portableResources = @(
+            'ActionHelp.xml',
+            'Licenses.txt',
+            'StrokesPlus.lua',
+            'StrokesPlus.xml'
+          )
+          foreach ($resource in $portableResources) {
+            $resourcePath = Join-Path $output $resource
+            if (-not (Test-Path -LiteralPath $resourcePath)) {
+              throw "Portable resource is missing: $resourcePath"
+            }
+          }
+
+          # Parsing these files here catches broken portable resources before upload.
+          [xml](Get-Content -LiteralPath (Join-Path $output 'ActionHelp.xml') -Raw) | Out-Null
+          [xml](Get-Content -LiteralPath (Join-Path $output 'StrokesPlus.xml') -Raw) | Out-Null
+
           $dist = Join-Path $env:GITHUB_WORKSPACE 'dist'
           $portable = Join-Path $dist 'StrokesPlus-portable-x64'
           New-Item -ItemType Directory -Force -Path $portable | Out-Null
@@ -65,9 +86,10 @@ jobs:
           Copy-Item -LiteralPath $exe -Destination (Join-Path $dist 'StrokesPlus-x64.exe')
           Copy-Item -LiteralPath $exe -Destination $portable
           Copy-Item -LiteralPath $dll -Destination $portable
-          Copy-Item -LiteralPath 'LICENSE.md' -Destination (Join-Path $portable 'Licenses.txt')
+          foreach ($resource in $portableResources) {
+            Copy-Item -LiteralPath (Join-Path $output $resource) -Destination $portable
+          }
           Copy-Item -LiteralPath 'README.md' -Destination $portable
-          Copy-Item -LiteralPath 'Help\ActionHelp.xml' -Destination $portable
           Copy-Item -LiteralPath 'Help\StrokesPlus.html' -Destination $portable
           Copy-Item -LiteralPath 'Help\images' -Destination $portable -Recurse
 
