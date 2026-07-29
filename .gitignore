@@ -24,6 +24,11 @@ mono_crash.*
 x64/
 x86/
 [Ww][Ii][Nn]32/
+# These are vendored source directories, not Visual Studio build outputs.
+!alien-0.5.1/libffi/win32/
+!alien-0.5.1/libffi/win32/**
+!scintilla_320/win32/
+!scintilla_320/win32/**
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
